@@ -30,16 +30,16 @@ impl Default for ImageCache {
 
 impl ImageCache {
     pub fn new() -> Self {
-        let (request_tx, request_rx) = channel::<PathBuf>();
-        let (result_tx, result_rx) = channel::<(PathBuf, DecodedImage)>();
+        let (request_sender, request_receiver) = channel::<PathBuf>();
+        let (result_sender, result_receiver) = channel::<(PathBuf, DecodedImage)>();
 
         thread::spawn(move || {
-            while let Ok(path) = request_rx.recv() {
-                let file_name = path.file_name().unwrap_or_default().to_string_lossy();
-                println!("Decoding: {}", file_name);
+            while let Ok(path) = request_receiver.recv() {
+                let file_name = path.display().to_string();
+                println!("Decoding in thread: {}", file_name);
                 if let Some(decoded) = decode_image(&path) {
                     println!("Decoded: {} ({}x{})", file_name, decoded.width, decoded.height);
-                    let _ = result_tx.send((path, decoded));
+                    let _ = result_sender.send((path, decoded));
                 } else {
                     eprintln!("Failed to decode: {}", file_name);
                 }
@@ -49,8 +49,8 @@ impl ImageCache {
         Self {
             textures: HashMap::new(),
             decoded: HashMap::new(),
-            receiver: result_rx,
-            sender: request_tx,
+            receiver: result_receiver,
+            sender: request_sender,
             loading: Vec::new(),
             lru_order: Vec::new(),
         }
@@ -58,6 +58,8 @@ impl ImageCache {
 
     pub fn poll(&mut self) {
         while let Ok((path, decoded)) = self.receiver.try_recv() {
+            let path_str = path.display().to_string();
+            println!("Received image result for path {path_str}");
             self.loading.retain(|p| p != &path);
             self.decoded.insert(path, decoded);
         }
@@ -81,6 +83,9 @@ impl ImageCache {
         let path_buf = path.to_path_buf();
 
         if let Some(decoded) = self.decoded.remove(&path_buf) {
+            let file_name = path.display().to_string();
+            println!("Generating texture for: {}", file_name);
+            
             let color_image = egui::ColorImage::from_rgba_unmultiplied(
                 [decoded.width, decoded.height],
                 &decoded.pixels,
@@ -93,6 +98,7 @@ impl ImageCache {
             self.textures.insert(path_buf.clone(), texture);
             self.update_lru(&path_buf);
             self.evict_if_needed();
+            println!("Texture generation complete");
         }
 
         if self.textures.contains_key(&path_buf) {
@@ -143,6 +149,8 @@ impl ImageCache {
 
 fn decode_image(path: &Path) -> Option<DecodedImage> {
     let img = image::open(path).ok()?;
+    // Downscale to max 2000px on longest side for faster display
+    let img = img.thumbnail(2000, 2000);
     let rgba = img.to_rgba8();
     Some(DecodedImage {
         width: rgba.width() as usize,
