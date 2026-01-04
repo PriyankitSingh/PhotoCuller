@@ -4,6 +4,7 @@ use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread;
 
 use eframe::egui;
+use zune_jpeg::JpegDecoder;
 
 const CACHE_SIZE: usize = 5;
 
@@ -148,10 +149,30 @@ impl ImageCache {
 }
 
 fn decode_image(path: &Path) -> Option<DecodedImage> {
-    let img = image::open(path).ok()?;
+    let ext = path.extension()?.to_str()?.to_lowercase();
+
+    let img = if ext == "jpg" || ext == "jpeg" {
+        // Use zune-jpeg for faster JPEG decoding
+        let data = std::fs::read(path).ok()?;
+        let mut decoder = JpegDecoder::new(&data);
+        let pixels = decoder.decode().ok()?;
+        let info = decoder.info()?;
+
+        let img = image::RgbImage::from_raw(
+            info.width as u32,
+            info.height as u32,
+            pixels,
+        )?;
+        image::DynamicImage::ImageRgb8(img)
+    } else {
+        // Fall back to image crate for other formats
+        image::open(path).ok()?
+    };
+
     // Downscale to max 2000px on longest side for faster display
     let img = img.thumbnail(2000, 2000);
     let rgba = img.to_rgba8();
+
     Some(DecodedImage {
         width: rgba.width() as usize,
         height: rgba.height() as usize,

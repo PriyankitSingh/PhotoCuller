@@ -8,6 +8,7 @@ description = "A high-performance photo culler for Fujifilm RAW+JPEG pairs"
 eframe = "0.29"
 image = { version = "0.25", default-features = false, features = ["jpeg"] }
 rfd = "0.15"
+zune-jpeg = "0.4"
 
 [profile.release]
 opt-level = 3
