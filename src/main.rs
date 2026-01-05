@@ -119,7 +119,7 @@ impl eframe::App for PhotoCullerApp {
             }
         });
 
-        // Top panel with controls
+        // Top panel 
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
             egui::menu::bar(ui, |ui| {
                 ui.menu_button("File", |ui| {
@@ -215,6 +215,7 @@ impl eframe::App for PhotoCullerApp {
                 ui.label("Space  : Next");
                 ui.label("Home   : First");
                 ui.label("End    : Last");
+                ui.label("Ctrl+D : Delete Marked");
             });
 
         // Central panel with image viewer
@@ -231,7 +232,6 @@ impl eframe::App for PhotoCullerApp {
                 let paths = self.get_jpeg_paths();
                 self.image_cache.preload_adjacent(&paths, self.current_index);
 
-                // Try to get the texture (will upload to GPU if decoded)
                 if let Some(texture) = self.image_cache.get_texture(ctx, &pair.jpeg_path) {
                     let available_size = ui.available_size();
                     let image_size = texture.size_vec2();
