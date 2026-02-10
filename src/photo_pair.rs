@@ -30,11 +30,16 @@ pub struct PhotoPair {
 
 impl PhotoPair {
     pub fn new(basename: String, jpeg_path: PathBuf, raw_path: Option<PathBuf>) -> Self {
+        let action = if raw_path.is_some() {
+            DeletionAction::KeepBoth
+        } else {
+            DeletionAction::DeleteRaw
+        };
         Self {
             basename,
             jpeg_path,
             raw_path,
-            action: DeletionAction::KeepBoth,
+            action,
         }
     }
 
